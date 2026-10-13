@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab жабдық брондау / Equipment Booking</title>
+  <style>
+    :root {
+      --primary: #2b6cb0; --primary-hover: #2c5282; --bg: #f7fafc;
+      --card-bg: #fff; --text-main: #2d3748; --text-muted: #718096;
+      --border-color: #e2e8f0; --danger-color: #e53e3e; --success-color: #38a169;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: var(--bg); color: var(--text-main); padding: 20px; line-height: 1.5; }
+    .container { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+    .header { grid-column: 1 / -1; background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border-color); }
+    .header h1 { font-size: 1.5rem; color: var(--primary); margin-bottom: 5px; }
+    .header p { color: var(--text-muted); font-size: .9rem; }
+    .card { background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 1px 3px #0000000a; }
+    .card h2 { font-size: 1.15rem; margin-bottom: 15px; border-bottom: 2px solid var(--border-color); padding-bottom: 7px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: 600; font-size: .88rem; }
+    select, input { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: .95rem; background: white; }
+    button { background: var(--primary); color: white; border: 0; padding: 11px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; }
+    button:hover { background: var(--primary-hover); }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .alert { padding: 11px 14px; border-radius: 6px; font-size: .9rem; margin-top: 15px; display: none; }
+    .alert-error { background: #fff5f5; color: #9b2c2c; border: 1px solid #feb2b2; }
+    .alert-success { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+    .booking-list, .slot-list { list-style: none; }
+    .booking-item { padding: 11px 4px; border-bottom: 1px solid var(--border-color); font-size: .9rem; }
+    .booking-item:last-child { border-bottom: 0; }
+    .booking-item strong { color: var(--primary); }
+    .booking-item small { display: block; color: var(--text-muted); margin-top: 3px; }
+    .slot-tag { display: inline-block; padding: 5px 9px; margin: 3px; border-radius: 5px; background: #edf2f7; color: #2d3748; font-size: .85rem; }
+    .muted { color: var(--text-muted); font-size: .9rem; }
+    .status { font-size: .8rem; font-weight: 600; color: var(--danger-color); }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>🔬 Lab жабдық брондау / Equipment Booking</h1>
+      <p>Зертханалық жабдықтарды онлайн брондау жүйесі</p>
+    </header>
+
+    <section class="card">
+      <h2>Жаңа брондау / New Booking</h2>
+      <form id="bookingForm">
+        <div class="form-group">
+          <label for="labSelect">Зертхана / Laboratory</label>
+          <select id="labSelect" required><option value="">Таңдаңыз / Select</option></select>
+        </div>
+        <div class="form-group">
+          <label for="equipmentSelect">Жабдық / Equipment</label>
+          <select id="equipmentSelect" required disabled><option value="">Әуелі зертхананы таңдаңыз</option></select>
+        </div>
+        <div class="form-group">
+          <label for="bookingDate">Күн / Date</label>
+          <input type="date" id="bookingDate" required>
+        </div>
+        <div class="form-group">
+          <label for="startTime">Басталу уақыты / Start Time</label>
+          <input type="time" id="startTime" required>
+        </div>
+        <div class="form-group">
+          <label for="endTime">Аяқталу уақыты / End Time</label>
+          <input type="time" id="endTime" required>
+        </div>
+        <div class="form-group">
+          <label for="userName">Пайдаланушы аты / User Name</label>
+          <input type="text" id="userName" placeholder="Аты-жөніңіз" maxlength="100" required>
+        </div>
+        <button type="submit">Брондауды растау / Confirm Booking</button>
+      </form>
+      <div id="alertBox" class="alert" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <h2>Бос уақыттар / Available Slots</h2>
+      <button id="checkSlotsBtn" type="button">Уақыттарды тексеру / Check Slots</button>
+      <div id="slotsContainer" style="margin-top:12px">
+        <p class="muted">Зертхана мен жабдықты таңдап, бос кестені көріңіз.</p>
+      </div>
+      <h2 style="margin-top:25px">Қазіргі брондар / Active Bookings</h2>
+      <ul id="bookingList" class="booking-list"></ul>
+    </section>
+  </main>
+
+  <script>
+    class Lab {
+      constructor(id, name, location) { this.id = id; this.name = name; this.location = location; }
+    }
+    class Equipment {
+      constructor(id, labId, name, model, isOperational = true) {
+        this.id = id; this.labId = labId; this.name = name; this.model = model; this.isOperational = isOperational;
+      }
+    }
+    class Booking {
+      constructor(id, equipmentId, userName, date, startTime, endTime) {
+        this.id = id; this.equipmentId = equipmentId; this.userName = userName;
+        this.date = date; this.startTime = startTime; this.endTime = endTime;
+      }
+    }
+
+    const labs = [
+      new Lab('lab1', 'Биохимия зертханасы', 'А Корпусы, 201'),
+      new Lab('lab2', 'Физика және инженерия', 'Б Корпусы, 105')
+    ];
+    const equipmentList = [
+      new Equipment('eq1', 'lab1', 'Спектрофотометр', 'UV-1800'),
+      new Equipment('eq2', 'lab1', 'Центрифуга', '5424 R'),
+      new Equipment('eq3', 'lab2', 'Осциллограф', 'Tektronix TBS1052B'),
+      new Equipment('eq4', 'lab2', '3D Принтер', 'Ender 3 Pro', false)
+    ];
+
+    function localDateString(date = new Date()) {
+      const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    let bookings = [
+      new Booking('b1', 'eq1', 'Әлібек Сұлтанов', '2025-03-01', '09:00', '11:00'),
+      new Booking('b2', 'eq1', 'Динара Қасымова', '2025-03-01', '14:00', '16:00')
+    ];
+
+    class BookingEngine {
+      static timeToMinutes(value) {
+        const [hours, minutes] = value.split(':').map(Number);
+        return hours * 60 + minutes;
+      }
+      static check(existing, equipmentId, date, start, end) {
+        if (!equipmentId || !date || !start || !end) return { error: true, message: 'Барлық өрісті толтырыңыз.' };
+        const startMin = this.timeToMinutes(start), endMin = this.timeToMinutes(end);
+        if (startMin >= endMin) return { error: true, message: 'Аяқталу уақыты басталу уақытынан кейін болуы керек.' };
+        if (startMin < 9 * 60 || endMin > 18 * 60) return { error: true, message: 'Брондау уақыты 09:00–18:00 аралығында болуы керек.' };
+        const conflict = existing.find(b =>
+          b.equipmentId === equipmentId && b.date === date &&
+          startMin < this.timeToMinutes(b.endTime) && this.timeToMinutes(b.startTime) < endMin
+        );
+        return conflict
+          ? { error: true, message: `Уақыт қайшылығы: ${conflict.startTime}–${conflict.endTime} аралығы брондалған (${conflict.userName}).` }
+          : { error: false };
+      }
+    }
+
+    class ApiService {
+      static async fetchFreeSlots(equipmentId, date) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        const free = [];
+        for (let hour = 9; hour < 18; hour++) {
+          const start = `${String(hour).padStart(2, '0')}:00`;
+          const end = `${String(hour + 1).padStart(2, '0')}:00`;
+          const result = BookingEngine.check(bookings, equipmentId, date, start, end);
+          if (!result.error) free.push(`${start} – ${end}`);
+        }
+        return free;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const labSelect = document.getElementById('labSelect');
+      const equipmentSelect = document.getElementById('equipmentSelect');
+      const dateInput = document.getElementById('bookingDate');
+      const form = document.getElementById('bookingForm');
+      const alertBox = document.getElementById('alertBox');
+      const slotsContainer = document.getElementById('slotsContainer');
+      const bookingList = document.getElementById('bookingList');
+
+      dateInput.value = localDateString();
+      dateInput.min = localDateString();
+
+      labs.forEach(lab => {
+        const option = document.createElement('option');
+        option.value = lab.id;
+        option.textContent = `${lab.name} (${lab.location})`;
+        labSelect.appendChild(option);
+      });
+
+      labSelect.addEventListener('change', () => {
+        equipmentSelect.innerHTML = '<option value="">Таңдаңыз / Select</option>';
+        const selectedLab = labSelect.value;
+        equipmentSelect.disabled = !selectedLab;
+        equipmentList.filter(eq => eq.labId === selectedLab).forEach(eq => {
+          const option = document.createElement('option');
+          option.value = eq.id;
+          option.textContent = `${eq.name} — ${eq.model}${eq.isOperational ? '' : ' (Жөндеуде / Under maintenance)'}`;
+          option.disabled = !eq.isOperational;
+          equipmentSelect.appendChild(option);
+        });
+        slotsContainer.innerHTML = '<p class="muted">Бос уақытты тексеру үшін батырманы басыңыз.</p>';
+      });
+
+      function showAlert(message, isError = false) {
+        alertBox.textContent = message;
+        alertBox.className = `alert ${isError ? 'alert-error' : 'alert-success'}`;
+        alertBox.style.display = 'block';
+      }
+
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        alertBox.style.display = 'none';
+        const equipmentId = equipmentSelect.value;
+        const date = dateInput.value;
+        const start = document.getElementById('startTime').value;
+        const end = document.getElementById('endTime').value;
+        const user = document.getElementById('userName').value.trim();
+
+        if (!user) { showAlert('Аты-жөніңізді енгізіңіз.', true); return; }
+        if (date < localDateString()) { showAlert('Өткен күнге брондау жасауға болмайды.', true); return; }
+        const validation = BookingEngine.check(bookings, equipmentId, date, start, end);
+        if (validation.error) { showAlert(validation.message, true); return; }
+
+        bookings.push(new Booking(`b${Date.now()}`, equipmentId, user, date, start, end));
+        showAlert('Брондау сәтті аяқталды! / Booking confirmed!');
+        renderBookings();
+        updateFreeSlots();
+        form.reset();
+        dateInput.value = localDateString();
+        dateInput.min = localDateString();
+        equipmentSelect.innerHTML = '<option value="">Әуелі зертхананы таңдаңыз</option>';
+        equipmentSelect.disabled = true;
+      });
+
+      document.getElementById('checkSlotsBtn').addEventListener('click', updateFreeSlots);
+      equipmentSelect.addEventListener('change', () => {
+        slotsContainer.innerHTML = '<p class="muted">Бос уақытты тексеру үшін батырманы басыңыз.</p>';
+      });
+      dateInput.addEventListener('change', () => {
+        slotsContainer.innerHTML = '<p class="muted">Кестені жаңарту үшін бос уақытты тексеріңіз.</p>';
+      });
+
+      async function updateFreeSlots() {
+        const equipmentId = equipmentSelect.value, date = dateInput.value;
+        if (!equipmentId || !date) {
+          slotsContainer.textContent = 'Алдымен зертхана, жабдық және күнді таңдаңыз.';
+          return;
+        }
+        slotsContainer.textContent = 'Жүктелуде...';
+        const slots = await ApiService.fetchFreeSlots(equipmentId, date);
+        slotsContainer.innerHTML = '';
+        if (!slots.length) {
+          slotsContainer.textContent = 'Бұл күнге бос уақыт жоқ.';
+          return;
+        }
+        slots.forEach(slot => {
+          const span = document.createElement('span');
+          span.className = 'slot-tag';
+          span.textContent = `🟢 ${slot}`;
+          slotsContainer.appendChild(span);
+        });
+      }
+
+      function renderBookings() {
+        bookingList.innerHTML = '';
+        if (!bookings.length) {
+          const li = document.createElement('li');
+          li.className = 'booking-item';
+          li.textContent = 'Әзірге брондау жоқ.';
+          bookingList.appendChild(li);
+          return;
+        }
+        bookings.forEach(booking => {
+          const equipment = equipmentList.find(eq => eq.id === booking.equipmentId);
+          const li = document.createElement('li');
+          li.className = 'booking-item';
+          const strong = document.createElement('strong');
+          strong.textContent = equipment ? equipment.name : 'Жабдық';
+          li.appendChild(strong);
+          li.appendChild(document.createTextNode(` — ${booking.userName}`));
+          const small = document.createElement('small');
+          small.textContent = `${booking.date} | ${booking.startTime} – ${booking.endTime}`;
+          li.appendChild(small);
+          bookingList.appendChild(li);
+        });
+      }
+      renderBookings();
+    });
+  </script>
+</body>
+</html>
